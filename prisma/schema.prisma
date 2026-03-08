@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma v7+: l'URL est gérée via prisma.config.ts / PrismaClient constructor.
+  // Ne mets plus `url = env("DATABASE_URL")` ici.
+}
+
+enum TransactionType {
+  TRANSFER
+  DEPOSIT
+  WITHDRAW
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  pinHash   String
+  role      String   @default("USER")     // USER | SYSTEM
+  status    String   @default("ACTIVE")   // ACTIVE | SUSPENDED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 🔐 PIN security
+  failedPinAttempts Int      @default(0)
+  pinLockedUntil    DateTime?
+  lastLoginAt       DateTime?
+
+  wallets         Wallet[]
+  auditsAsActor   AuditLog[] @relation("AuditActor")
+  auditsAsTarget  AuditLog[] @relation("AuditTarget")
+
+  idempotencyKeys IdempotencyKey[]
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String
+  currency  String   @default("XOF")
+  balance   BigInt   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  txFrom    Transaction[] @relation("TxFrom")
+  txTo      Transaction[] @relation("TxTo")
+
+  @@index([userId])
+  @@unique([userId, currency])
+}
+
+model Transaction {
+  id           String          @id @default(uuid())
+  type         TransactionType @default(TRANSFER)
+  fromWalletId String
+  toWalletId   String
+  amount       BigInt
+  fee          BigInt          @default(0)
+  status       String          @default("PENDING") // PENDING | SUCCESS | FAILED
+  createdAt    DateTime        @default(now())
+
+  fromWallet   Wallet          @relation("TxFrom", fields: [fromWalletId], references: [id], onDelete: Restrict)
+  toWallet     Wallet          @relation("TxTo", fields: [toWalletId], references: [id], onDelete: Restrict)
+
+  @@index([type])
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@index([createdAt])
+}
+
+model IdempotencyKey {
+  id           String   @id @default(uuid())
+  key          String
+  userId       String
+  endpoint     String
+  requestHash  String
+  responseBody String?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint, key], name: "userId_endpoint_key")
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  actorUserId  String?
+  targetUserId String?
+  ip           String?
+  userAgent    String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+
+  actor  User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target User? @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
+}
+
+
+
