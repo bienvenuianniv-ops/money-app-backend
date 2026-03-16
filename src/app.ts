@@ -7,8 +7,9 @@ import authRoutes from "./routes/auth.routes";
 import walletRoutes from "./routes/wallet.routes";
 import transactionsRoutes from "./routes/transactions.routes";
 import devRoutes from "./routes/dev.routes";
-
-// RATE LIMIT
+import notchpayRoutes from "./routes/notchpay.routes";
+import fedapayRoutes from "./routes/fedapay.routes";
+// MIDDLEWARES
 import { globalLimiter } from "./middleware/rateLimit";
 
 // ERROR HANDLER
@@ -28,8 +29,6 @@ app.get("/__debug_app", (_req, res) => {
 // ======================
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
-
-// ✅ GLOBAL RATE LIMIT (après cors/json, avant routes)
 app.use(globalLimiter);
 
 // ======================
@@ -40,20 +39,14 @@ app.get("/health", (_req, res) => {
 });
 
 // ======================
-// ROUTES
+// ROUTES (STABLE)
 // ======================
-if (process.env.NODE_ENV !== "test") {
-  console.log({
-    authRoutesType: typeof authRoutes,
-    walletRoutesType: typeof walletRoutes,
-    transactionsRoutesType: typeof transactionsRoutes,
-    devRoutesType: typeof devRoutes,
-  });
-}
-app.use(authRoutes);
-app.use(walletRoutes);
-app.use(transactionsRoutes);
-app.use(devRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api", walletRoutes);
+app.use("/api", transactionsRoutes);
+app.use("/api", devRoutes);
+app.use("/api", notchpayRoutes);
+app.use("/api", fedapayRoutes);
 
 // ======================
 // 404 JSON
@@ -63,7 +56,7 @@ app.use((_req, res) => {
 });
 
 // ======================
-// ERROR HANDLER (dernier)
+// GLOBAL ERROR HANDLER
 // ======================
 app.use(errorHandler);
 
