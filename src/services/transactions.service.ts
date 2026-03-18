@@ -26,8 +26,8 @@ type TransferInput = {
   senderUserId: string;
   recipientPhone: string;
   amount: number;
-  currency?: string;           // devise souhaitée (optionnel, défaut = devise du sender)
-  note?: string;               // note optionnelle
+  currency?: string;
+  note?: string;
   idempotencyKey: string;
   ip?: string | null;
   userAgent?: string | null;
@@ -84,7 +84,6 @@ export class TransactionsService {
       correlationId = null,
     } = input;
 
-    // Validations de base
     if (!recipientPhone || typeof recipientPhone !== "string") {
       throw new TransactionError("Le numéro du destinataire est requis.", 400);
     }
@@ -98,7 +97,6 @@ export class TransactionsService {
     const endpoint = "POST:/api/transactions/transfer";
     const requestHash = this.buildRequestHash({ senderUserId, recipientPhone, amount, endpoint });
 
-    // Idempotence
     const existingKey = await prisma.idempotencyKey.findFirst({
       where: { userId: senderUserId, endpoint, key: idempotencyKey },
     });
@@ -113,7 +111,6 @@ export class TransactionsService {
         : { message: "Requête déjà traitée." };
     }
 
-    // Chargement expéditeur
     const sender = await prisma.user.findUnique({
       where: { id: senderUserId },
       include: { wallets: true },
@@ -121,7 +118,6 @@ export class TransactionsService {
     if (!sender) throw new TransactionError("Expéditeur introuvable.", 404);
     if (sender.status !== "ACTIVE") throw new TransactionError("Compte expéditeur inactif.", 403);
 
-    // Chargement destinataire
     const recipient = await prisma.user.findUnique({
       where: { phone: recipientPhone },
       include: { wallets: true },
@@ -130,8 +126,6 @@ export class TransactionsService {
     if (recipient.status !== "ACTIVE") throw new TransactionError("Compte destinataire inactif.", 403);
     if (recipient.id === sender.id) throw new TransactionError("Transfert vers soi-même interdit.", 400);
 
-    // Résolution des wallets
-    // Si une devise est spécifiée, on l'utilise, sinon on prend la devise du sender
     const senderCurrency = currency || sender.wallets[0]?.currency || "XOF";
     const recipientCurrency = recipient.wallets[0]?.currency || "XOF";
 
@@ -142,10 +136,7 @@ export class TransactionsService {
       );
     }
 
-    // Le destinataire reçoit dans sa propre devise
     let recipientWallet = recipient.wallets.find((w) => w.currency === recipientCurrency && w.isActive);
-
-    // Si le destinataire n'a pas de wallet dans sa devise, on lui en crée un
     if (!recipientWallet) {
       recipientWallet = await prisma.wallet.create({
         data: { userId: recipient.id, currency: recipientCurrency, balance: 0n, isActive: true },
@@ -153,8 +144,6 @@ export class TransactionsService {
     }
 
     const amountBigInt = BigInt(amount);
-
-    // Calcul frais et conversion
     const fee = ExchangeService.calculateFee(amountBigInt, senderCurrency, recipientCurrency);
     const totalDebit = amountBigInt + fee;
 
@@ -165,19 +154,20 @@ export class TransactionsService {
       );
     }
 
-    // Conversion de devises
     const { convertedAmount, rate } = await ExchangeService.convert(
       amountBigInt,
       senderCurrency,
       recipientCurrency
     );
 
-    // Référence unique lisible
     const reference = this.generateReference();
 
-    // Transaction atomique
+    // Charger le wallet SYSTEM avant la transaction atomique
+    const systemWallet = await prisma.wallet.findFirst({
+      where: { user: { role: "SYSTEM" }, currency: senderCurrency },
+    });
+
     const result = await prisma.$transaction(async (tx) => {
-      // Re-vérification du solde en base (protection contre race condition)
       const freshSenderWallet = await tx.wallet.findUnique({ where: { id: senderWallet.id } });
       const freshRecipientWallet = await tx.wallet.findUnique({ where: { id: recipientWallet!.id } });
 
@@ -188,7 +178,7 @@ export class TransactionsService {
         throw new TransactionError("Solde insuffisant.", 400);
       }
 
-      // Débit expéditeur
+      // Débit expéditeur (montant + frais)
       const updatedSenderWallet = await tx.wallet.update({
         where: { id: freshSenderWallet.id },
         data: { balance: freshSenderWallet.balance - totalDebit },
@@ -200,7 +190,14 @@ export class TransactionsService {
         data: { balance: freshRecipientWallet.balance + convertedAmount },
       });
 
-      // Enregistrement transaction
+      // ── NOUVEAU : Crédit wallet SYSTEM avec les frais ──
+      if (fee > 0n && systemWallet) {
+        await tx.wallet.update({
+          where: { id: systemWallet.id },
+          data: { balance: { increment: fee } },
+        });
+      }
+
       const transaction = await tx.transaction.create({
         data: {
           type: "TRANSFER",
@@ -247,7 +244,6 @@ export class TransactionsService {
         },
       };
 
-      // Sauvegarde idempotence
       await tx.idempotencyKey.create({
         data: {
           key: idempotencyKey,
@@ -261,7 +257,6 @@ export class TransactionsService {
       return responsePayload;
     });
 
-    // Audit log
     await AuditService.logTransfer({
       actorUserId: sender.id,
       targetUserId: recipient.id,
@@ -297,7 +292,6 @@ export class TransactionsService {
     if (!user) throw new TransactionError("Utilisateur introuvable.", 404);
     if (user.status !== "ACTIVE") throw new TransactionError("Compte inactif.", 403);
 
-    // Trouver ou créer le wallet dans la devise demandée
     let wallet = user.wallets.find((w) => w.currency === currency && w.isActive);
     if (!wallet) {
       wallet = await prisma.wallet.create({
@@ -308,8 +302,6 @@ export class TransactionsService {
     const amountBigInt = BigInt(amount);
     const reference = this.generateReference();
 
-    // Wallet système pour le dépôt (à configurer selon votre logique métier)
-    // En MVP, on crée un wallet "SYSTEM" comme source de dépôt
     let systemWallet = await prisma.wallet.findFirst({
       where: { user: { role: "SYSTEM" }, currency },
     });
@@ -420,6 +412,14 @@ export class TransactionsService {
         where: { id: wallet.id },
         data: { balance: freshWallet.balance - totalDebit },
       });
+
+      // ── NOUVEAU : Crédit wallet SYSTEM avec les frais du retrait ──
+      if (fee > 0n) {
+        await tx.wallet.update({
+          where: { id: systemWallet!.id },
+          data: { balance: { increment: fee } },
+        });
+      }
 
       const transaction = await tx.transaction.create({
         data: {
@@ -543,7 +543,6 @@ export class TransactionsService {
         fromWalletId: tx.fromWalletId,
         toWalletId: tx.toWalletId,
         createdAt: tx.createdAt,
-        // Sens de la transaction pour l'utilisateur
         direction: walletIds.includes(tx.fromWalletId) ? "SENT" : "RECEIVED",
       })),
       total,
