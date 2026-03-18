@@ -29,11 +29,6 @@ app.set("trust proxy", 1);
 app.get("/__debug_app", (_req, res) => {
   return res.json({ ok: true, version: "APP_TS_ACTIVE_V1" });
 });
-app.get("/__debug_routes", (_req, res) => {
-  const fs = require('fs');
-  const files = fs.readdirSync('./dist/routes/');
-  return res.json({ files });
-});
 
 // ======================
 // MIDDLEWARES
