@@ -9,6 +9,7 @@ import transactionsRoutes from "./routes/transactions.routes";
 import devRoutes from "./routes/dev.routes";
 import notchpayRoutes from "./routes/notchpay.routes";
 import fedapayRoutes from "./routes/fedapay.routes";
+import adminRoutes from "./routes/admin.routes";
 // MIDDLEWARES
 import { globalLimiter } from "./middleware/rateLimit";
 
@@ -27,6 +28,11 @@ app.set("trust proxy", 1);
 // ======================
 app.get("/__debug_app", (_req, res) => {
   return res.json({ ok: true, version: "APP_TS_ACTIVE_V1" });
+});
+app.get("/__debug_routes", (_req, res) => {
+  const fs = require('fs');
+  const files = fs.readdirSync('./dist/routes/');
+  return res.json({ files });
 });
 
 // ======================
@@ -55,6 +61,7 @@ app.use("/api", transactionsRoutes);
 app.use("/api", devRoutes);
 app.use("/api", notchpayRoutes);
 app.use("/api", fedapayRoutes);
+app.use("/api", adminRoutes);
 
 // ======================
 // 404 JSON
