@@ -18,6 +18,11 @@ import { errorHandler } from "./middleware/error";
 const app = express();
 
 // ======================
+// TRUST PROXY (Render)
+// ======================
+app.set("trust proxy", 1);
+
+// ======================
 // DEBUG ENDPOINT
 // ======================
 app.get("/__debug_app", (_req, res) => {
