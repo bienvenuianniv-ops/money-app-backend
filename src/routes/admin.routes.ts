@@ -88,13 +88,13 @@ router.post("/admin/withdraw-fees", requireAuth, requireAdmin, async (req, res, 
       });
     }
 
-   const withdrawAmount = new Decimal(String(amount).trim());
-if (withdrawAmount.lte(0)) {
-  return res.status(400).json({
-    success: false,
-    message: "Le montant doit être supérieur à 0.",
-  });
-}
+    const withdrawAmount = new Decimal(String(amount).trim());
+    if (withdrawAmount.lte(0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Le montant doit être supérieur à 0.",
+      });
+    }
 
     // 2. Trouver le wallet SYSTEM
     const systemWallet = await prisma.wallet.findFirst({
@@ -149,19 +149,20 @@ if (withdrawAmount.lte(0)) {
         where: { id: systemWallet.id },
         data: { balance: { decrement: BigInt(withdrawAmount.toFixed(0)) } },
       }),
-  prisma.transaction.create({
+      prisma.transaction.create({
         data: {
           type: "WITHDRAW",
           status: "SUCCESS",
           amount: BigInt(withdrawAmount.toFixed(0)),
           fee: BigInt(0),
           toCurrency: currency,
-          senderId: systemWallet.userId,
-          receiverId: systemWallet.userId,
+          fromId: systemWallet.userId,
+          toId: systemWallet.userId,
           description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,
         },
       }),
     ]);
+
     return res.json({
       success: true,
       message: `Retrait de ${withdrawAmount.toString()} ${currency} effectué avec succès.`,
