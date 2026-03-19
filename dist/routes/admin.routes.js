@@ -135,7 +135,7 @@ router.post("/admin/withdraw-fees", auth_1.requireAuth, requireAdmin, async (req
                     status: "SUCCESS",
                     amount: BigInt(withdrawAmount.toFixed(0)),
                     fee: BigInt(0),
-                    currency,
+                    toCurrency: currency,
                     senderId: systemWallet.userId,
                     receiverId: systemWallet.userId,
                     description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,

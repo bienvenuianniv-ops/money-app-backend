@@ -112,7 +112,7 @@ if (withdrawAmount.lte(0)) {
     }
 
     // 3. Vérifier le solde
-    if (new Decimal(systemWallet.balance).lt(withdrawAmount)) {
+    if (new Decimal(systemWallet.balance.toString()).lt(withdrawAmount)) {
       return res.status(400).json({
         success: false,
         message: "Solde insuffisant dans le wallet SYSTEM.",
@@ -147,21 +147,20 @@ if (withdrawAmount.lte(0)) {
     const [updatedWallet, transaction] = await prisma.$transaction([
       prisma.wallet.update({
         where: { id: systemWallet.id },
-        data: { balance: { decrement: withdrawAmount } },
+        data: { balance: { decrement: BigInt(withdrawAmount.toFixed(0)) } },
       }),
       prisma.transaction.create({
-        data: {
-          type: "WITHDRAW",
-          status: "SUCCESS",
-          amount: withdrawAmount,
-          fee: new Decimal(0),
-          currency,
-          senderId: systemWallet.userId,
-          receiverId: systemWallet.userId,
-          description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,
-        },
-      }),
-    ]);
+  data: {
+    type: "WITHDRAW",
+    status: "SUCCESS",
+    amount: BigInt(withdrawAmount.toFixed(0)),
+    fee: BigInt(0),
+    toCurrency: currency,
+    senderId: systemWallet.userId,
+    receiverId: systemWallet.userId,
+    description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,
+  },
+}),
 
     return res.json({
       success: true,
