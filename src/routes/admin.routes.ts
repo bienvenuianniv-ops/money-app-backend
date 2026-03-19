@@ -149,19 +149,19 @@ if (withdrawAmount.lte(0)) {
         where: { id: systemWallet.id },
         data: { balance: { decrement: BigInt(withdrawAmount.toFixed(0)) } },
       }),
-      prisma.transaction.create({
-  data: {
-    type: "WITHDRAW",
-    status: "SUCCESS",
-    amount: BigInt(withdrawAmount.toFixed(0)),
-    fee: BigInt(0),
-    toCurrency: currency,
-    senderId: systemWallet.userId,
-    receiverId: systemWallet.userId,
-    description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,
-  },
-}),
-
+  prisma.transaction.create({
+        data: {
+          type: "WITHDRAW",
+          status: "SUCCESS",
+          amount: BigInt(withdrawAmount.toFixed(0)),
+          fee: BigInt(0),
+          toCurrency: currency,
+          senderId: systemWallet.userId,
+          receiverId: systemWallet.userId,
+          description: `Retrait frais admin vers ${phoneNumber} — réf: ${reference}`,
+        },
+      }),
+    ]);
     return res.json({
       success: true,
       message: `Retrait de ${withdrawAmount.toString()} ${currency} effectué avec succès.`,
