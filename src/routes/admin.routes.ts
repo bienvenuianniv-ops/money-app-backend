@@ -88,13 +88,13 @@ router.post("/admin/withdraw-fees", requireAuth, requireAdmin, async (req, res, 
       });
     }
 
-    const withdrawAmount = new Decimal(amount);
-    if (withdrawAmount.lte(0)) {
-      return res.status(400).json({
-        success: false,
-        message: "Le montant doit être supérieur à 0.",
-      });
-    }
+   const withdrawAmount = new Decimal(String(amount).trim());
+if (withdrawAmount.lte(0)) {
+  return res.status(400).json({
+    success: false,
+    message: "Le montant doit être supérieur à 0.",
+  });
+}
 
     // 2. Trouver le wallet SYSTEM
     const systemWallet = await prisma.wallet.findFirst({
