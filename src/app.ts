@@ -34,7 +34,7 @@ app.get("/__debug_app", (_req, res) => {
 // MIDDLEWARES
 // ======================
 app.use(cors({
-  origin: ['https://mayouservice.com', 'http://localhost:4000'],
+origin: ['https://mayouservice.com', 'https://pay.mayouservice.com', 'http://localhost:4000'],
   credentials: true
 }));
 app.use(express.json({ limit: "1mb" }));
