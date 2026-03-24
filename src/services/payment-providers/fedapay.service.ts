@@ -270,7 +270,7 @@ console.log("ENV CHECK:", cleanKey?.slice(0, 15));
 export const fedapay = new FedaPayService({
   secretKey:   cleanKey,
   publicKey:   (process.env.FEDAPAY_PUBLIC_KEY || "").trim(),
-  environment: (process.env.FEDAPAY_ENV as "live" | "sandbox") || "sandbox",
+  environment: (process.env.FEDAPAY_ENV as "live" | "sandbox") || "live",
   callbackUrl: process.env.FEDAPAY_CALLBACK_URL || "http://localhost:3000/payment/success",
   notifyUrl:   process.env.FEDAPAY_NOTIFY_URL   || "http://localhost:4000/api/webhooks/fedapay",
 });
