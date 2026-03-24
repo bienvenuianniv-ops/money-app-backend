@@ -121,7 +121,8 @@ export class FedaPayService {
     console.log("TOKEN RESPONSE:", JSON.stringify(tokenRes.data).slice(0, 200));
 
     const token      = tokenRes.data.token;
-    const paymentUrl = `https://checkout.fedapay.com/pay/${token}`;
+    const paymentUrl = tokenRes.data?.url || tokenRes.data?.payment_url || `https://checkout.fedapay.com/pay/${token}`;
+console.log("PAYMENT URL FINAL:", paymentUrl);
 
     return {
       id:         tx.id,
