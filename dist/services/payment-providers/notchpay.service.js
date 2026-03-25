@@ -37,6 +37,7 @@ class NotchpayService {
             description: params.description,
             callback: this.config.callbackUrl,
         };
+        console.log("[NOTCHPAY PAYLOAD]", JSON.stringify(payload));
         let response;
         try {
             response = await axios_1.default.post(`${NOTCHPAY_BASE}/payments/initialize`, payload, { headers: this.headers });
