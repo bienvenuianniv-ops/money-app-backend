@@ -25,7 +25,7 @@ class NotchpayService {
             "Content-Type": "application/json",
         };
     }
-    // ── DÉPÔT : Initier un paiement ───────────────────────────────
+    // ── DÉPÔT : Initier un paiement ──────────────────────────────
     async initiateDeposit(params) {
         const payload = {
             amount: params.amount,
@@ -37,7 +37,14 @@ class NotchpayService {
             description: params.description,
             callback: this.config.callbackUrl,
         };
-        const response = await axios_1.default.post(`${NOTCHPAY_BASE}/payments/initialize`, payload, { headers: this.headers });
+        let response;
+        try {
+            response = await axios_1.default.post(`${NOTCHPAY_BASE}/payments/initialize`, payload, { headers: this.headers });
+        }
+        catch (err) {
+            console.error("[NOTCHPAY ERROR]", JSON.stringify(err?.response?.data));
+            throw new Error(err?.response?.data?.message || err.message);
+        }
         const data = response.data;
         if (!data.authorization_url && !data.transaction?.authorization_url) {
             throw new Error(`Notchpay erreur: ${JSON.stringify(data)}`);
