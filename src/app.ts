@@ -10,6 +10,7 @@ import devRoutes from "./routes/dev.routes";
 import notchpayRoutes from "./routes/notchpay.routes";
 import fedapayRoutes from "./routes/fedapay.routes";
 import adminRoutes from "./routes/admin.routes";
+import paytechRoutes from "./routes/paytech.routes";
 // MIDDLEWARES
 import { globalLimiter } from "./middleware/rateLimit";
 
@@ -57,6 +58,7 @@ app.use("/api", devRoutes);
 app.use("/api", notchpayRoutes);
 app.use("/api", fedapayRoutes);
 app.use("/api", adminRoutes);
+app.use("/api", paytechRoutes);
 
 // ======================
 // 404 JSON
