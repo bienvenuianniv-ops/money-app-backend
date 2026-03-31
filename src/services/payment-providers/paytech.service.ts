@@ -3,24 +3,23 @@
 // Docs : https://paytech.sn
 
 import axios from "axios";
-import crypto from "crypto";
 
 const PAYTECH_BASE = "https://paytech.sn";
 
 export interface PayTechConfig {
-  apiKey:    string; // process.env.PAYTECH_API_KEY
-  secretKey: string; // process.env.PAYTECH_SECRET_KEY
+  apiKey:    string;
+  secretKey: string;
   successUrl: string;
   cancelUrl:  string;
   ipnUrl:     string;
 }
 
 export interface PayTechPaymentResult {
-  reference:        string;
-  redirectUrl:      string;
-  token:            string;
-  status:           string;
-  raw:              any;
+  reference:   string;
+  redirectUrl: string;
+  token:       string;
+  status:      string;
+  raw:         any;
 }
 
 export class PayTechService {
@@ -32,34 +31,37 @@ export class PayTechService {
 
   private get headers() {
     return {
-      "API_KEY":        this.config.apiKey,
-      "API_SECRET":     this.config.secretKey,
-      "Content-Type":   "application/json",
+      "API_KEY":      this.config.apiKey,
+      "API_SECRET":   this.config.secretKey,
+      "Content-Type": "application/json",
     };
   }
 
   // ── DÉPÔT : Initier un paiement ──────────────────────────────
 
   async initiateDeposit(params: {
-    amount:      number;
-    currency:    string;
-    itemName:    string;
-    itemPrice:   number;
-    reference:   string;
-    customField?: string;
+    amount:        number;
+    currency:      string;
+    itemName:      string;
+    itemPrice:     number;
+    reference:     string;
+    customerName?: string;
+    customField?:  string;
   }): Promise<PayTechPaymentResult> {
 
     const payload = {
-      item_name:    params.itemName,
-      item_price:   params.itemPrice,
-      currency:     params.currency,
-      ref_command:  params.reference,
-      command_name: params.itemName,
-      env:          "prod",
-      success_url:  this.config.successUrl,
-      cancel_url:   this.config.cancelUrl,
-      ipn_url:      this.config.ipnUrl,
-      custom_field: params.customField || JSON.stringify({ reference: params.reference }),
+      item_name:     params.itemName,
+      item_price:    params.itemPrice,
+      currency:      params.currency,
+      ref_command:   params.reference,
+      command_name:  params.itemName,
+      env:           "prod",
+      success_url:   this.config.successUrl,
+      cancel_url:    this.config.cancelUrl,
+      ipn_url:       this.config.ipnUrl,
+      custom_field:  params.customField || JSON.stringify({ reference: params.reference }),
+      // Nom du client requis par PayTech
+      customer_fullname: params.customerName || "Client PayWest",
     };
 
     console.log("[PAYTECH PAYLOAD]", JSON.stringify(payload));
@@ -118,7 +120,6 @@ export class PayTechService {
   // ── WEBHOOK : Vérifier et parser ──────────────────────────────
 
   verifyWebhook(body: any): boolean {
-    // PayTech envoie les données IPN par POST
     return body && body.type_event === "sale_complete";
   }
 

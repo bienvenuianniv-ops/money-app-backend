@@ -17,12 +17,13 @@ const router = (0, express_1.Router)();
  * Body: {
  *   amount: number,
  *   currency: string,     // XOF
- *   description?: string
+ *   description?: string,
+ *   customerName?: string
  * }
  */
 router.post("/paytech/deposit", auth_1.requireAuth, async (req, res, next) => {
     try {
-        const { amount, currency, description } = req.body;
+        const { amount, currency, description, customerName } = req.body;
         if (!amount || !currency) {
             return res.status(400).json({
                 success: false,
@@ -35,6 +36,12 @@ router.post("/paytech/deposit", auth_1.requireAuth, async (req, res, next) => {
                 message: "Le montant doit être un entier positif.",
             });
         }
+        // Récupérer le téléphone de l'utilisateur comme fallback
+        const user = await db_1.prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { id: true, phone: true },
+        });
+        const name = customerName || (user?.phone ? `Client ${user.phone}` : "Client PayWest");
         const reference = `DEP-PT-${req.user.id.slice(0, 8)}-${Date.now()}`;
         const result = await paytech_service_1.paytech.initiateDeposit({
             amount,
@@ -42,6 +49,7 @@ router.post("/paytech/deposit", auth_1.requireAuth, async (req, res, next) => {
             itemName: description || `Dépôt PayWest ${amount} ${currency}`,
             itemPrice: amount,
             reference,
+            customerName: name,
             customField: JSON.stringify({ userId: req.user.id, reference }),
         });
         await audit_service_1.AuditService.log({
@@ -100,7 +108,6 @@ router.post("/webhooks/paytech", async (req, res) => {
         const event = paytech_service_1.paytech.parseWebhook(req.body);
         console.log("[WEBHOOK] PayTech event parsé:", event);
         if (event.status === "complete" && event.reference) {
-            // Extraire l'userId depuis la référence (format: DEP-PT-USERID-timestamp)
             const parts = event.reference.split("-");
             const userIdPartial = parts[2];
             if (userIdPartial) {

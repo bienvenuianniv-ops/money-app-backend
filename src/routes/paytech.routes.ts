@@ -19,7 +19,8 @@ const router = Router();
  * Body: {
  *   amount: number,
  *   currency: string,     // XOF
- *   description?: string
+ *   description?: string,
+ *   customerName?: string
  * }
  */
 router.post(
@@ -27,7 +28,7 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { amount, currency, description } = req.body;
+      const { amount, currency, description, customerName } = req.body;
 
       if (!amount || !currency) {
         return res.status(400).json({
@@ -43,15 +44,24 @@ router.post(
         });
       }
 
+      // Récupérer le téléphone de l'utilisateur comme fallback
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, phone: true },
+      });
+
+      const name = customerName || (user?.phone ? `Client ${user.phone}` : "Client PayWest");
+
       const reference = `DEP-PT-${req.user.id.slice(0, 8)}-${Date.now()}`;
 
       const result = await paytech.initiateDeposit({
         amount,
         currency,
-        itemName:  description || `Dépôt PayWest ${amount} ${currency}`,
-        itemPrice: amount,
+        itemName:     description || `Dépôt PayWest ${amount} ${currency}`,
+        itemPrice:    amount,
         reference,
-        customField: JSON.stringify({ userId: req.user.id, reference }),
+        customerName: name,
+        customField:  JSON.stringify({ userId: req.user.id, reference }),
       });
 
       await AuditService.log({
@@ -122,7 +132,6 @@ router.post(
       console.log("[WEBHOOK] PayTech event parsé:", event);
 
       if (event.status === "complete" && event.reference) {
-        // Extraire l'userId depuis la référence (format: DEP-PT-USERID-timestamp)
         const parts = event.reference.split("-");
         const userIdPartial = parts[2];
 

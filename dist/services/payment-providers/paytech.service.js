@@ -33,6 +33,8 @@ class PayTechService {
             cancel_url: this.config.cancelUrl,
             ipn_url: this.config.ipnUrl,
             custom_field: params.customField || JSON.stringify({ reference: params.reference }),
+            // Nom du client requis par PayTech
+            customer_fullname: params.customerName || "Client PayWest",
         };
         console.log("[PAYTECH PAYLOAD]", JSON.stringify(payload));
         let response;
@@ -69,7 +71,6 @@ class PayTechService {
     }
     // ── WEBHOOK : Vérifier et parser ──────────────────────────────
     verifyWebhook(body) {
-        // PayTech envoie les données IPN par POST
         return body && body.type_event === "sale_complete";
     }
     parseWebhook(body) {
