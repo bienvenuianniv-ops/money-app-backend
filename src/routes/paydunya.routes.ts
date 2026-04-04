@@ -17,10 +17,6 @@ const IPN_URL    = "https://paywest-backend.onrender.com/api/webhooks/paydunya";
 // DÉPÔT
 // ─────────────────────────────────────────────────────────────
 
-/**
- * POST /api/paydunya/deposit
- * Body: { amount, currency, description?, customerName? }
- */
 router.post(
   "/paydunya/deposit",
   requireAuth,
@@ -29,17 +25,11 @@ router.post(
       const { amount, currency, description, customerName } = req.body;
 
       if (!amount || !currency) {
-        return res.status(400).json({
-          success: false,
-          message: "amount et currency sont requis.",
-        });
+        return res.status(400).json({ success: false, message: "amount et currency sont requis." });
       }
 
       if (!Number.isInteger(amount) || amount <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Le montant doit être un entier positif.",
-        });
+        return res.status(400).json({ success: false, message: "Le montant doit être un entier positif." });
       }
 
       const user = await prisma.user.findUnique({
@@ -51,22 +41,21 @@ router.post(
       const reference = `DEP-PD-${req.user.id.slice(0, 8)}-${Date.now()}`;
 
       const result = await paydunya.initiateDeposit({
-        amount,
-        currency,
-        description:  description || `Dépôt PayWest ${amount} ${currency}`,
+        amount, currency,
+        description: description || `Dépôt PayWest ${amount} ${currency}`,
         reference,
         customerName: name,
-        returnUrl:    RETURN_URL,
-        cancelUrl:    CANCEL_URL,
-        ipnUrl:       IPN_URL,
+        returnUrl: RETURN_URL,
+        cancelUrl: CANCEL_URL,
+        ipnUrl: IPN_URL,
       });
 
       await AuditService.log({
-        action:      "PAYDUNYA_DEPOSIT_INITIATED",
+        action: "PAYDUNYA_DEPOSIT_INITIATED",
         actorUserId: req.user.id,
-        severity:    "INFO",
-        ip:          req.ip ?? null,
-        metadata:    { amount, currency, reference },
+        severity: "INFO",
+        ip: req.ip ?? null,
+        metadata: { amount, currency, reference },
       });
 
       return res.status(200).json({
@@ -80,10 +69,7 @@ router.post(
         },
       });
     } catch (error: any) {
-      return res.status(502).json({
-        success: false,
-        message: `Erreur PayDunya: ${error.message}`,
-      });
+      return res.status(502).json({ success: false, message: `Erreur PayDunya: ${error.message}` });
     }
   }
 );
@@ -92,9 +78,6 @@ router.post(
 // VÉRIFICATION DU STATUT
 // ─────────────────────────────────────────────────────────────
 
-/**
- * GET /api/paydunya/status/:token
- */
 router.get(
   "/paydunya/status/:token",
   requireAuth,
@@ -103,10 +86,7 @@ router.get(
       const result = await paydunya.checkPaymentStatus(req.params.token as string);
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
-      return res.status(502).json({
-        success: false,
-        message: `Erreur PayDunya: ${error.message}`,
-      });
+      return res.status(502).json({ success: false, message: `Erreur PayDunya: ${error.message}` });
     }
   }
 );
@@ -115,69 +95,83 @@ router.get(
 // WEBHOOK IPN
 // ─────────────────────────────────────────────────────────────
 
-/**
- * POST /api/webhooks/paydunya
- */
 router.post(
   "/webhooks/paydunya",
   async (req: Request, res: Response) => {
     try {
- const body = req.body && Object.keys(req.body).length > 0 ? req.body : req.query;
-      console.log("[WEBHOOK] PayDunya:", JSON.stringify(body));
-      const event = paydunya.parseWebhook(body);
-      console.log("[WEBHOOK] PayDunya event parsé:", event);
+      // Logger tout pour diagnostic
+      console.log("[WEBHOOK] PayDunya body:", JSON.stringify(req.body));
+      console.log("[WEBHOOK] PayDunya query:", JSON.stringify(req.query));
+      console.log("[WEBHOOK] PayDunya headers:", JSON.stringify(req.headers));
 
-      if (event.status === "complete" && event.reference) {
-        const parts = event.reference.split("-");
-        const userIdPartial = parts[2];
+      // PayDunya peut envoyer le token via query string
+      const token = req.query.token || req.body?.token;
+      console.log("[WEBHOOK] PayDunya token reçu:", token);
 
-        if (userIdPartial) {
-          const user = await prisma.user.findFirst({
-            where: { id: { startsWith: userIdPartial } },
-            include: { wallets: true },
-          });
+      if (!token) {
+        console.log("[WEBHOOK] PayDunya: pas de token, on ignore");
+        return res.status(200).json({ received: true });
+      }
 
-          if (user) {
-            let wallet = user.wallets.find(
-              (w) => w.currency === "XOF" && w.isActive
-            );
+      // Vérifier le statut via l'API PayDunya
+      const statusResult = await paydunya.checkPaymentStatus(token as string);
+      console.log("[WEBHOOK] PayDunya statut:", JSON.stringify(statusResult));
 
-            if (!wallet) {
-              wallet = await prisma.wallet.create({
-                data: { userId: user.id, currency: "XOF", balance: 0n, isActive: true },
-              });
-            }
+      if (statusResult.status === "complete" || statusResult.status === "completed") {
+        // Extraire la référence depuis le raw
+        const reference = statusResult.raw?.custom_data?.reference || "";
+        console.log("[WEBHOOK] PayDunya référence:", reference);
 
-            const systemWallet = await prisma.wallet.findFirst({
-              where: { user: { role: "SYSTEM" }, currency: "XOF" },
+        if (reference) {
+          const parts = reference.split("-");
+          const userIdPartial = parts[2];
+
+          if (userIdPartial) {
+            const user = await prisma.user.findFirst({
+              where: { id: { startsWith: userIdPartial } },
+              include: { wallets: true },
             });
 
-            if (systemWallet) {
-              await prisma.$transaction(async (tx) => {
-                await tx.wallet.update({
-                  where: { id: wallet!.id },
-                  data: { balance: { increment: BigInt(event.amount) } },
-                });
+            if (user) {
+              let wallet = user.wallets.find((w) => w.currency === "XOF" && w.isActive);
 
-                await tx.transaction.create({
-                  data: {
-                    type:            "DEPOSIT",
-                    fromWalletId:    systemWallet.id,
-                    toWalletId:      wallet!.id,
-                    amount:          BigInt(event.amount),
-                    fee:             0n,
-                    fromCurrency:    "XOF",
-                    toCurrency:      "XOF",
-                    exchangeRate:    1.0,
-                    convertedAmount: BigInt(event.amount),
-                    status:          "SUCCESS",
-                    reference:       event.reference,
-                    note:            "Dépôt confirmé via PayDunya",
-                  },
+              if (!wallet) {
+                wallet = await prisma.wallet.create({
+                  data: { userId: user.id, currency: "XOF", balance: 0n, isActive: true },
                 });
+              }
+
+              const systemWallet = await prisma.wallet.findFirst({
+                where: { user: { role: "SYSTEM" }, currency: "XOF" },
               });
 
-              console.log(`[WEBHOOK] PayDunya wallet crédité: ${event.amount} XOF pour user ${user.id}`);
+              if (systemWallet) {
+                await prisma.$transaction(async (tx) => {
+                  await tx.wallet.update({
+                    where: { id: wallet!.id },
+                    data: { balance: { increment: BigInt(statusResult.amount) } },
+                  });
+
+                  await tx.transaction.create({
+                    data: {
+                      type: "DEPOSIT",
+                      fromWalletId: systemWallet.id,
+                      toWalletId: wallet!.id,
+                      amount: BigInt(statusResult.amount),
+                      fee: 0n,
+                      fromCurrency: "XOF",
+                      toCurrency: "XOF",
+                      exchangeRate: 1.0,
+                      convertedAmount: BigInt(statusResult.amount),
+                      status: "SUCCESS",
+                      reference,
+                      note: "Dépôt confirmé via PayDunya",
+                    },
+                  });
+                });
+
+                console.log(`[WEBHOOK] PayDunya wallet crédité: ${statusResult.amount} XOF pour user ${user.id}`);
+              }
             }
           }
         }
