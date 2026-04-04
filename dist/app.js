@@ -39,6 +39,7 @@ app.use((0, cors_1.default)({
     credentials: true
 }));
 app.use(express_1.default.json({ limit: "1mb" }));
+app.use(express_1.default.urlencoded({ extended: true, limit: "1mb" }));
 app.use(rateLimit_1.globalLimiter);
 // ======================
 // HEALTH CHECK

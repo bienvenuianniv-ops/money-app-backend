@@ -40,6 +40,7 @@ origin: ['https://mayouservice.com', 'https://pay.mayouservice.com', 'http://loc
   credentials: true
 }));
 app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(globalLimiter);
 
 // ======================
