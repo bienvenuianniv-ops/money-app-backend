@@ -82,7 +82,7 @@ router.post("/webhooks/paydunya", async (req, res) => {
         console.log("[WEBHOOK] PayDunya query:", JSON.stringify(req.query));
         console.log("[WEBHOOK] PayDunya headers:", JSON.stringify(req.headers));
         // PayDunya peut envoyer le token via query string
-        const token = req.query.token || req.body?.token;
+        const token = req.query.token || req.body?.data?.invoice?.token || req.body?.token;
         console.log("[WEBHOOK] PayDunya token reçu:", token);
         if (!token) {
             console.log("[WEBHOOK] PayDunya: pas de token, on ignore");
