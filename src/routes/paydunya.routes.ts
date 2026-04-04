@@ -73,7 +73,7 @@ router.post(
         success: true,
         data: {
           token:       result.token,
-          redirectUrl: `https://app.paydunya.com/sandbox/checkout-invoice/${result.token}`,
+          redirectUrl: result.redirectUrl,
           reference:   result.reference,
           status:      result.status,
           message:     "Cliquez sur le lien pour compléter le paiement.",
