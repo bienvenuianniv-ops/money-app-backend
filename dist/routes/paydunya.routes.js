@@ -100,8 +100,9 @@ router.get("/paydunya/status/:token", auth_1.requireAuth, async (req, res) => {
  */
 router.post("/webhooks/paydunya", async (req, res) => {
     try {
-        console.log("[WEBHOOK] PayDunya:", JSON.stringify(req.body));
-        const event = paydunya_service_1.paydunya.parseWebhook(req.body);
+        const body = req.body && Object.keys(req.body).length > 0 ? req.body : req.query;
+        console.log("[WEBHOOK] PayDunya:", JSON.stringify(body));
+        const event = paydunya_service_1.paydunya.parseWebhook(body);
         console.log("[WEBHOOK] PayDunya event parsé:", event);
         if (event.status === "complete" && event.reference) {
             const parts = event.reference.split("-");
