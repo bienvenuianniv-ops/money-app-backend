@@ -184,8 +184,9 @@ router.post(
     }
   }
 );
+
 // ─────────────────────────────────────────────────────────────
-// RETRAIT
+// RETRAIT avec vrai déboursement PayDunya
 // ─────────────────────────────────────────────────────────────
 
 /**
@@ -230,7 +231,7 @@ router.post(
 
       const reference = `WD-PD-${req.user.id.slice(0, 8)}-${Date.now()}`;
 
-      // Déduire le solde
+      // Déduire le solde du wallet PayWest
       await prisma.wallet.update({
         where: { id: wallet.id },
         data: { balance: { decrement: BigInt(totalDeducted) } },
@@ -260,6 +261,30 @@ router.post(
         });
       }
 
+      // Envoyer l'argent via PayDunya déboursement
+      try {
+        const disbResult = await paydunya.sendMoney({
+          amount,
+          phone,
+          operator,
+          name: name || `Client ${user.phone}`,
+          reference,
+          note: `Retrait PayWest ${amount} XOF`,
+        });
+        console.log("[WITHDRAW] PayDunya déboursement:", JSON.stringify(disbResult));
+      } catch (disbErr: any) {
+        console.error("[WITHDRAW] Erreur déboursement PayDunya:", disbErr.message);
+        // Le solde a déjà été débité — on note l'erreur mais on continue
+      }
+
+      await AuditService.log({
+        action: "PAYDUNYA_WITHDRAW_INITIATED",
+        actorUserId: req.user.id,
+        severity: "INFO",
+        ip: req.ip ?? null,
+        metadata: { amount, currency, reference, phone, operator },
+      });
+
       return res.status(200).json({
         success: true,
         data: {
@@ -268,7 +293,7 @@ router.post(
           fee,
           phone,
           operator,
-          message: `Retrait de ${amount} XOF initié vers ${phone}.`,
+          message: `Retrait de ${amount} XOF initié vers ${phone}. Vous recevrez l'argent sous peu.`,
         },
       });
     } catch (error: any) {

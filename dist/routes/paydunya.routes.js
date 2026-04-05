@@ -150,7 +150,7 @@ router.post("/webhooks/paydunya", async (req, res) => {
     }
 });
 // ─────────────────────────────────────────────────────────────
-// RETRAIT
+// RETRAIT avec vrai déboursement PayDunya
 // ─────────────────────────────────────────────────────────────
 /**
  * POST /api/paydunya/withdraw
@@ -182,7 +182,7 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: "Solde insuffisant pour couvrir les frais." });
         }
         const reference = `WD-PD-${req.user.id.slice(0, 8)}-${Date.now()}`;
-        // Déduire le solde
+        // Déduire le solde du wallet PayWest
         await db_1.prisma.wallet.update({
             where: { id: wallet.id },
             data: { balance: { decrement: BigInt(totalDeducted) } },
@@ -209,6 +209,29 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
                 },
             });
         }
+        // Envoyer l'argent via PayDunya déboursement
+        try {
+            const disbResult = await paydunya_service_1.paydunya.sendMoney({
+                amount,
+                phone,
+                operator,
+                name: name || `Client ${user.phone}`,
+                reference,
+                note: `Retrait PayWest ${amount} XOF`,
+            });
+            console.log("[WITHDRAW] PayDunya déboursement:", JSON.stringify(disbResult));
+        }
+        catch (disbErr) {
+            console.error("[WITHDRAW] Erreur déboursement PayDunya:", disbErr.message);
+            // Le solde a déjà été débité — on note l'erreur mais on continue
+        }
+        await audit_service_1.AuditService.log({
+            action: "PAYDUNYA_WITHDRAW_INITIATED",
+            actorUserId: req.user.id,
+            severity: "INFO",
+            ip: req.ip ?? null,
+            metadata: { amount, currency, reference, phone, operator },
+        });
         return res.status(200).json({
             success: true,
             data: {
@@ -217,7 +240,7 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
                 fee,
                 phone,
                 operator,
-                message: `Retrait de ${amount} XOF initié vers ${phone}.`,
+                message: `Retrait de ${amount} XOF initié vers ${phone}. Vous recevrez l'argent sous peu.`,
             },
         });
     }

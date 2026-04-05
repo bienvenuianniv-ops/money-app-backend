@@ -73,6 +73,44 @@ class PayDunyaService {
             raw: data,
         };
     }
+    // ── DÉBOURSEMENT : Envoyer vers Mobile Money ─────────────
+    async sendMoney(params) {
+        const payload = {
+            send_money: [
+                {
+                    amount: params.amount,
+                    phone_number: params.phone,
+                    operator: params.operator,
+                    first_name: params.name,
+                    last_name: "",
+                }
+            ],
+            amount: params.amount,
+            reference: params.reference,
+        };
+        console.log("[PAYDUNYA SEND_MONEY PAYLOAD]", JSON.stringify(payload));
+        let response;
+        try {
+            response = await axios_1.default.post(`${PAYDUNYA_BASE}/disburse/get-status`, payload, { headers: this.headers });
+        }
+        catch (err) {
+            // Essayer l'endpoint de déboursement direct
+            try {
+                response = await axios_1.default.post(`${PAYDUNYA_BASE}/disburse`, payload, { headers: this.headers });
+            }
+            catch (err2) {
+                console.error("[PAYDUNYA SEND_MONEY ERROR]", JSON.stringify(err2?.response?.data));
+                throw new Error(err2?.response?.data?.message || err2.message);
+            }
+        }
+        const data = response.data;
+        console.log("[PAYDUNYA SEND_MONEY RESPONSE]", JSON.stringify(data));
+        return {
+            status: data.response_code === "00" ? "success" : "failed",
+            reference: params.reference,
+            raw: data,
+        };
+    }
     // ── WEBHOOK IPN ───────────────────────────────────────────
     parseWebhook(body) {
         return {
