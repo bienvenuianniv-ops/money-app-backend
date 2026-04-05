@@ -77,22 +77,18 @@ router.get("/paydunya/status/:token", auth_1.requireAuth, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.post("/webhooks/paydunya", async (req, res) => {
     try {
-        // Logger tout pour diagnostic
         console.log("[WEBHOOK] PayDunya body:", JSON.stringify(req.body));
         console.log("[WEBHOOK] PayDunya query:", JSON.stringify(req.query));
         console.log("[WEBHOOK] PayDunya headers:", JSON.stringify(req.headers));
-        // PayDunya peut envoyer le token via query string
         const token = req.query.token || req.body?.data?.invoice?.token || req.body?.token;
         console.log("[WEBHOOK] PayDunya token reçu:", token);
         if (!token) {
             console.log("[WEBHOOK] PayDunya: pas de token, on ignore");
             return res.status(200).json({ received: true });
         }
-        // Vérifier le statut via l'API PayDunya
         const statusResult = await paydunya_service_1.paydunya.checkPaymentStatus(token);
         console.log("[WEBHOOK] PayDunya statut:", JSON.stringify(statusResult));
         if (statusResult.status === "complete" || statusResult.status === "completed") {
-            // Extraire la référence depuis le raw
             const reference = statusResult.raw?.custom_data?.reference || "";
             console.log("[WEBHOOK] PayDunya référence:", reference);
             if (reference) {
@@ -152,10 +148,6 @@ router.post("/webhooks/paydunya", async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // RETRAIT avec vrai déboursement PayDunya
 // ─────────────────────────────────────────────────────────────
-/**
- * POST /api/paydunya/withdraw
- * Body: { amount, currency, phone, operator, name }
- */
 router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
     try {
         const { amount, currency, phone, operator, name } = req.body;
@@ -165,6 +157,8 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
                 message: "amount, phone et operator sont requis.",
             });
         }
+        // Formater le numéro avec indicatif pays
+        const formattedPhone = phone.startsWith('+') ? phone : `+221${phone}`;
         const user = await db_1.prisma.user.findUnique({
             where: { id: req.user.id },
             include: { wallets: true },
@@ -205,7 +199,7 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
                     convertedAmount: BigInt(amount),
                     status: "SUCCESS",
                     reference,
-                    note: `Retrait vers ${phone} via ${operator}`,
+                    note: `Retrait vers ${formattedPhone} via ${operator}`,
                 },
             });
         }
@@ -213,7 +207,7 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
         try {
             const disbResult = await paydunya_service_1.paydunya.sendMoney({
                 amount,
-                phone,
+                phone: formattedPhone,
                 operator,
                 name: name || `Client ${user.phone}`,
                 reference,
@@ -223,14 +217,13 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
         }
         catch (disbErr) {
             console.error("[WITHDRAW] Erreur déboursement PayDunya:", disbErr.message);
-            // Le solde a déjà été débité — on note l'erreur mais on continue
         }
         await audit_service_1.AuditService.log({
             action: "PAYDUNYA_WITHDRAW_INITIATED",
             actorUserId: req.user.id,
             severity: "INFO",
             ip: req.ip ?? null,
-            metadata: { amount, currency, reference, phone, operator },
+            metadata: { amount, currency, reference, phone: formattedPhone, operator },
         });
         return res.status(200).json({
             success: true,
@@ -238,9 +231,9 @@ router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
                 reference,
                 amount,
                 fee,
-                phone,
+                phone: formattedPhone,
                 operator,
-                message: `Retrait de ${amount} XOF initié vers ${phone}. Vous recevrez l'argent sous peu.`,
+                message: `Retrait de ${amount} XOF initié vers ${formattedPhone}. Vous recevrez l'argent sous peu.`,
             },
         });
     }
