@@ -14,7 +14,6 @@ const dev_routes_1 = __importDefault(require("./routes/dev.routes"));
 const notchpay_routes_1 = __importDefault(require("./routes/notchpay.routes"));
 const fedapay_routes_1 = __importDefault(require("./routes/fedapay.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
-const paytech_routes_1 = __importDefault(require("./routes/paytech.routes"));
 const paydunya_routes_1 = __importDefault(require("./routes/paydunya.routes"));
 // MIDDLEWARES
 const rateLimit_1 = require("./middleware/rateLimit");
@@ -57,7 +56,6 @@ app.use("/api", dev_routes_1.default);
 app.use("/api", notchpay_routes_1.default);
 app.use("/api", fedapay_routes_1.default);
 app.use("/api", admin_routes_1.default);
-app.use("/api", paytech_routes_1.default);
 app.use("/api", paydunya_routes_1.default);
 // ======================
 // 404 JSON
