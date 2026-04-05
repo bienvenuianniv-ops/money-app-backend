@@ -149,5 +149,81 @@ router.post("/webhooks/paydunya", async (req, res) => {
         return res.status(200).json({ received: true });
     }
 });
+// ─────────────────────────────────────────────────────────────
+// RETRAIT
+// ─────────────────────────────────────────────────────────────
+/**
+ * POST /api/paydunya/withdraw
+ * Body: { amount, currency, phone, operator, name }
+ */
+router.post("/paydunya/withdraw", auth_1.requireAuth, async (req, res) => {
+    try {
+        const { amount, currency, phone, operator, name } = req.body;
+        if (!amount || !phone || !operator) {
+            return res.status(400).json({
+                success: false,
+                message: "amount, phone et operator sont requis.",
+            });
+        }
+        const user = await db_1.prisma.user.findUnique({
+            where: { id: req.user.id },
+            include: { wallets: true },
+        });
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Utilisateur introuvable." });
+        }
+        const wallet = user.wallets.find((w) => w.currency === (currency || "XOF") && w.isActive);
+        if (!wallet || wallet.balance < BigInt(amount)) {
+            return res.status(400).json({ success: false, message: "Solde insuffisant." });
+        }
+        const fee = Math.round(amount * 0.01);
+        const totalDeducted = amount + fee;
+        if (wallet.balance < BigInt(totalDeducted)) {
+            return res.status(400).json({ success: false, message: "Solde insuffisant pour couvrir les frais." });
+        }
+        const reference = `WD-PD-${req.user.id.slice(0, 8)}-${Date.now()}`;
+        // Déduire le solde
+        await db_1.prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { decrement: BigInt(totalDeducted) } },
+        });
+        // Enregistrer la transaction
+        const systemWallet = await db_1.prisma.wallet.findFirst({
+            where: { user: { role: "SYSTEM" }, currency: currency || "XOF" },
+        });
+        if (systemWallet) {
+            await db_1.prisma.transaction.create({
+                data: {
+                    type: "WITHDRAW",
+                    fromWalletId: wallet.id,
+                    toWalletId: systemWallet.id,
+                    amount: BigInt(amount),
+                    fee: BigInt(fee),
+                    fromCurrency: currency || "XOF",
+                    toCurrency: currency || "XOF",
+                    exchangeRate: 1.0,
+                    convertedAmount: BigInt(amount),
+                    status: "SUCCESS",
+                    reference,
+                    note: `Retrait vers ${phone} via ${operator}`,
+                },
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            data: {
+                reference,
+                amount,
+                fee,
+                phone,
+                operator,
+                message: `Retrait de ${amount} XOF initié vers ${phone}.`,
+            },
+        });
+    }
+    catch (error) {
+        return res.status(502).json({ success: false, message: `Erreur retrait: ${error.message}` });
+    }
+});
 exports.default = router;
 //# sourceMappingURL=paydunya.routes.js.map
