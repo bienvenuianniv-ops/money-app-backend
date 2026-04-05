@@ -7,8 +7,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paydunya = exports.PayDunyaService = void 0;
 const axios_1 = __importDefault(require("axios"));
-const PAYDUNYA_BASE = "https://app.paydunya.com/sandbox-api/v1"; // Test
-// const PAYDUNYA_BASE = "https://app.paydunya.com/api/v1"; // Production
+const PAYDUNYA_BASE = "https://app.paydunya.com/api/v1"; // Production
 class PayDunyaService {
     get headers() {
         return {

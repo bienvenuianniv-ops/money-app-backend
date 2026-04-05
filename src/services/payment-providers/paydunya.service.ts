@@ -3,8 +3,7 @@
  
 import axios from "axios";
  
-const PAYDUNYA_BASE = "https://app.paydunya.com/sandbox-api/v1"; // Test
-// const PAYDUNYA_BASE = "https://app.paydunya.com/api/v1"; // Production
+const PAYDUNYA_BASE = "https://app.paydunya.com/api/v1"; // Production
  
 export class PayDunyaService {
  
