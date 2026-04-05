@@ -124,47 +124,33 @@ export class PayDunyaService {
     reference: string;
     raw:       any;
   }> {
-
     const payload = {
       send_money: [
         {
-          amount:       params.amount,
-          phone_number: params.phone,
-          operator:     params.operator,
-          first_name:   params.name,
-          last_name:    "",
+          amount:        params.amount,
+          phone_number:  params.phone,
+          withdraw_mode: params.operator,
+          first_name:    params.name,
+          last_name:     "",
         }
       ],
       amount:    params.amount,
       reference: params.reference,
     };
-
     console.log("[PAYDUNYA SEND_MONEY PAYLOAD]", JSON.stringify(payload));
-
     let response;
     try {
       response = await axios.post(
-        `${PAYDUNYA_BASE}/disburse/get-status`,
+        `https://app.paydunya.com/api/v2/disburse/get-invoice`,
         payload,
         { headers: this.headers }
       );
     } catch (err: any) {
-      // Essayer l'endpoint de déboursement direct
-      try {
-        response = await axios.post(
-          `${PAYDUNYA_BASE}/disburse`,
-          payload,
-          { headers: this.headers }
-        );
-      } catch (err2: any) {
-        console.error("[PAYDUNYA SEND_MONEY ERROR]", JSON.stringify(err2?.response?.data));
-        throw new Error(err2?.response?.data?.message || err2.message);
-      }
+      console.error("[PAYDUNYA SEND_MONEY ERROR]", JSON.stringify(err?.response?.data));
+      throw new Error(err?.response?.data?.message || err.message);
     }
-
     const data = response.data;
     console.log("[PAYDUNYA SEND_MONEY RESPONSE]", JSON.stringify(data));
-
     return {
       status:    data.response_code === "00" ? "success" : "failed",
       reference: params.reference,

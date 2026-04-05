@@ -80,7 +80,7 @@ class PayDunyaService {
                 {
                     amount: params.amount,
                     phone_number: params.phone,
-                    operator: params.operator,
+                    withdraw_mode: params.operator,
                     first_name: params.name,
                     last_name: "",
                 }
@@ -91,17 +91,11 @@ class PayDunyaService {
         console.log("[PAYDUNYA SEND_MONEY PAYLOAD]", JSON.stringify(payload));
         let response;
         try {
-            response = await axios_1.default.post(`${PAYDUNYA_BASE}/disburse/get-status`, payload, { headers: this.headers });
+            response = await axios_1.default.post(`https://app.paydunya.com/api/v2/disburse/get-invoice`, payload, { headers: this.headers });
         }
         catch (err) {
-            // Essayer l'endpoint de déboursement direct
-            try {
-                response = await axios_1.default.post(`${PAYDUNYA_BASE}/disburse`, payload, { headers: this.headers });
-            }
-            catch (err2) {
-                console.error("[PAYDUNYA SEND_MONEY ERROR]", JSON.stringify(err2?.response?.data));
-                throw new Error(err2?.response?.data?.message || err2.message);
-            }
+            console.error("[PAYDUNYA SEND_MONEY ERROR]", JSON.stringify(err?.response?.data));
+            throw new Error(err?.response?.data?.message || err.message);
         }
         const data = response.data;
         console.log("[PAYDUNYA SEND_MONEY RESPONSE]", JSON.stringify(data));
