@@ -78,7 +78,7 @@ class PayDunyaService {
         const payload = {
             account_alias: params.phone.replace('+221', '').replace('+', ''),
             amount: params.amount,
-            withdraw_mode: params.operator,
+            withdraw_mode: params.operator.replace(/_/g, '-'),
             callback_url: "https://paywest-backend.onrender.com/api/webhooks/paydunya",
         };
         console.log("[PAYDUNYA SEND_MONEY PAYLOAD]", JSON.stringify(payload));
