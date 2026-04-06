@@ -217,7 +217,7 @@ router.post(
         return res.status(400).json({ success: false, message: "Solde insuffisant." });
       }
 
-      const fee = Math.round(amount * 0.01);
+      const fee = 0; // Retrait gratuit — stratégie d'acquisition
       const totalDeducted = amount + fee;
 
       if (wallet.balance < BigInt(totalDeducted)) {
